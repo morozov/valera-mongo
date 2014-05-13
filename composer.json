@@ -1,0 +1,23 @@
+{
+  "name": "valera/mongo",
+  "description": "MongoDB adapter for Valera",
+  "authors": [
+    {
+      "name": "Sergei Morozov",
+      "email": "morozov@tut.by"
+    }
+  ],
+  "license": "MIT",
+  "autoload": {
+    "psr-0": {
+      "Valera": "src/"
+    }
+  },
+  "require": {
+    "ext-mongo": "*",
+    "valera/engine": "dev-master"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "~4.0"
+  }
+}
