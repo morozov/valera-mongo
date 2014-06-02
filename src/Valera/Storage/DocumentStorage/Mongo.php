@@ -2,6 +2,7 @@
 
 namespace Valera\Storage\DocumentStorage;
 
+use Valera\Entity\Document;
 use Valera\Resource;
 use Valera\Serializer\DocumentSerializer;
 use Valera\Storage\BlobStorage;
@@ -34,11 +35,14 @@ class Mongo implements DocumentStorage
         ));
     }
 
-    public function create($id, array $data, array $resources)
+    /**
+     * {@inheritDoc}
+     */
+    public function create(Document $document)
     {
         try {
             $this->db->documents->insert(
-                $this->formatDocument($id, $data, $resources)
+                $this->formatDocument($document)
             );
         } catch (\MongoDuplicateKeyException $e) {
             throw new \DomainException('Document already exists', 0, $e);
@@ -70,13 +74,19 @@ class Mongo implements DocumentStorage
         return $this->getCursorIterator($cursor);
     }
 
-    public function update($id, array $data, array $resources)
+    /**
+     * {@inheritDoc}
+     */
+    public function update(Document $document)
     {
         $this->db->documents->update(array(
-            '_id' => $id,
-        ), $this->formatDocument($id, $data, $resources));
+            '_id' => $document->getId(),
+        ), $this->formatDocument($document));
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function delete($id)
     {
         $this->db->documents->findAndModify(
@@ -91,16 +101,25 @@ class Mongo implements DocumentStorage
         );
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function clean()
     {
         $this->db->documents->drop();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function count()
     {
         return $this->db->documents->count();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public function getIterator()
     {
         $cursor = $this->db->documents->find();
@@ -120,11 +139,11 @@ class Mongo implements DocumentStorage
     /**
      * Serializes document before storing
      *
-     * @param array $document
+     * @param \Valera\Entity\Document $document
      *
      * @return array
      */
-    protected function serialize(array $document)
+    protected function serialize(Document $document)
     {
         return $this->serializer->serialize($document);
     }
@@ -134,7 +153,7 @@ class Mongo implements DocumentStorage
      *
      * @param array $params
      *
-     * @return array
+     * @return \Valera\Entity\Document
      */
     protected function unserialize(array $params)
     {
@@ -144,25 +163,24 @@ class Mongo implements DocumentStorage
     /**
      * Formats document data for internal representation
      *
-     * @param string $id
-     * @param array $data
-     * @param Resource[] $resources
+     * @param \Valera\Entity\Document $document
      *
      * @return array
      */
-    protected function formatDocument($id, array $data, array $resources)
+    protected function formatDocument(Document $document)
     {
-        $document = array(
-            '_id' => $id,
-            'data' => $this->serialize($data),
+        $formatted = array(
+            '_id' => $document->getId(),
+            'data' => $this->serialize($document),
         );
 
+        $resources = $document->getResources();
         if ($resources) {
-            $document['resources'] = array_map(function (Resource $resource) {
+            $formatted['resources'] = array_map(function (Resource $resource) {
                 return $resource->getHash();
             }, $resources);
         }
 
-        return $document;
+        return $formatted;
     }
 }
