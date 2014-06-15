@@ -76,6 +76,19 @@ class Mongo implements Queue
     {
         try {
             /** @var \MongoCollection $pending */
+            $this->db->{$this->name . '_index'}->insert(array(
+                '_id' => $item->getHash(),
+            ));
+        } catch (MongoCursorException $e) {
+            if ($e->getCode() === 11000) {
+                return;
+            } else {
+                throw $e;
+            }
+        }
+
+        try {
+            /** @var \MongoCollection $pending */
             $this->db->{$this->name . '_pending'}->insert(array(
                 '_id' => $item->getHash(),
                 'seq' => $this->getNextSequence('pending'),
@@ -144,6 +157,7 @@ class Mongo implements Queue
     /** {@inheritDoc} */
     public function clean()
     {
+        $this->db->{$this->name . '_index'}->drop();
         $this->db->{$this->name . '_counters'}->drop();
         $this->db->{$this->name . '_pending'}->drop();
         $this->db->{$this->name . '_in_progress'}->drop();
