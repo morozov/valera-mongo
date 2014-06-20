@@ -74,6 +74,17 @@ class Mongo implements Queue
     /** @inheritDoc */
     public function enqueue(Queueable $item)
     {
+        if ($this->isInQueue($item)) {
+            return;
+        }
+
+        $this->addToCollection($item, 'pending', array(
+            'seq' => $this->getNextSequence('pending'),
+        ));
+    }
+
+    protected function isInQueue(Queueable $item)
+    {
         try {
             /** @var \MongoCollection $pending */
             $this->db->{$this->name . '_index'}->insert(array(
@@ -81,24 +92,13 @@ class Mongo implements Queue
             ));
         } catch (MongoCursorException $e) {
             if ($e->getCode() === 11000) {
-                return;
+                return true;
             } else {
                 throw $e;
             }
         }
 
-        try {
-            /** @var \MongoCollection $pending */
-            $this->db->{$this->name . '_pending'}->insert(array(
-                '_id' => $item->getHash(),
-                'seq' => $this->getNextSequence('pending'),
-                'data' => $this->serializer->serialize($item),
-            ));
-        } catch (MongoCursorException $e) {
-            if ($e->getCode() !== 11000) {
-                throw $e;
-            }
-        }
+        return false;
     }
 
     protected function getNextSequence($name)
@@ -157,13 +157,18 @@ class Mongo implements Queue
     /** {@inheritDoc} */
     public function clean()
     {
-        $this->db->{$this->name . '_index'}->drop();
-        $this->db->{$this->name . '_counters'}->drop();
-        $this->db->{$this->name . '_pending'}->drop();
-        $this->db->{$this->name . '_in_progress'}->drop();
-        $this->db->{$this->name . '_completed'}->drop();
-        $this->db->{$this->name . '_failed'}->drop();
+        $this->dropCollection('index');
+        $this->dropCollection('counters');
+        $this->dropCollection('pending');
+        $this->dropCollection('in_progress');
+        $this->dropCollection('completed');
+        $this->dropCollection('failed');
         $this->setUp();
+    }
+
+    protected function dropCollection($name)
+    {
+        $this->db->{$this->name . '_' . $name}->drop();
     }
 
     /** @inheritDoc */
@@ -188,6 +193,28 @@ class Mongo implements Queue
     public function count()
     {
         return $this->db->{$this->name . '_pending'}->count();
+    }
+
+    /** {@inheritDoc} */
+    public function reEnqueueFailed()
+    {
+        foreach ($this->getFailed() as $item) {
+            $this->addToCollection($item, 'pending');
+        }
+
+        $this->dropCollection('failed');
+    }
+
+    /** {@inheritDoc} */
+    public function reEnqueueAll()
+    {
+        $this->reEnqueueFailed();
+
+        foreach ($this->getCompleted() as $item) {
+            $this->addToCollection($item, 'pending');
+        }
+
+        $this->dropCollection('completed');
     }
 
     protected function getCollection($name)
