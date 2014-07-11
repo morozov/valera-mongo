@@ -29,7 +29,9 @@ class Iterator extends \IteratorIterator
     public function current()
     {
         $current = parent::current();
-        $current = $this->serializer->unserialize($current['data']);
+        $current = $this->serializer->unserialize(array_merge($current, array(
+            'id' => $this->key(),
+        )));
 
         return $current;
     }

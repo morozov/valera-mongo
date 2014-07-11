@@ -56,7 +56,9 @@ class Mongo implements DocumentStorage
         ));
 
         if ($document) {
-            return $this->unserialize($document['data']);
+            return $this->unserialize(array_merge($document, array(
+                'id' => $id,
+            )));
         }
 
         return null;
@@ -169,10 +171,11 @@ class Mongo implements DocumentStorage
      */
     protected function formatDocument(Document $document)
     {
-        $formatted = array(
+        $serialized = $this->serialize($document);
+        unset($serialized['id']);
+        $formatted = array_merge(array(
             '_id' => $document->getId(),
-            'data' => $this->serialize($document),
-        );
+        ), $serialized);
 
         $resources = $document->getResources();
         if ($resources) {
